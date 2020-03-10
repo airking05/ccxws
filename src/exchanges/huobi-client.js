@@ -1,5 +1,5 @@
 const BasicClient = require("../basic-client");
-const pako = require('pako');
+const zlib = require("minizlib");
 const Ticker = require("../ticker");
 const Trade = require("../trade");
 const Level2Point = require("../level2-point");
@@ -72,60 +72,60 @@ class HuobiClient extends BasicClient {
     );
   }
 
-  _onMessage(raw) {
-    let resp;
-    try {
-      resp = pako.inflate(raw,{ to: 'string' });
-    } catch (err) {
-      this.emit("error", err);
-      return;
-    }
-    let msgs = JSON.parse(resp);
-
-    // handle pongs
-    if (msgs.ping) {
-      this._sendPong(msgs.ping);
-      return;
-    }
-
-    if (!msgs.ch) return;
-
-    // trades
-    if (msgs.ch.endsWith("trade.detail")) {
-      msgs = JSON.parse(resp.toString().replace(/:([0-9]{1,}\.{0,1}[0-9]{0,}),/g, ':"$1",'));
-
-      let remoteId = msgs.ch.split(".")[1]; //market.ethbtc.trade.detail
-      let market = this._tradeSubs.get(remoteId);
-      if (!market) return;
-
-      for (let datum of msgs.tick.data) {
-        let trade = this._constructTradesFromMessage(datum, market);
-        this.emit("trade", trade, market);
+  _onMessage(raw) {    
+    zlib.unzip(raw, (err, resp) => {
+      if (err) {
+        this.emit("error", err);
+        return;
       }
-      return;
-    }
 
-    // tickers
-    if (msgs.ch.endsWith(".detail")) {
-      let remoteId = msgs.ch.split(".")[1];
-      let market = this._tickerSubs.get(remoteId);
-      if (!market) return;
+      let msgs = JSON.parse(resp);
 
-      let ticker = this._constructTicker(msgs.tick, market);
-      this.emit("ticker", ticker, market);
-      return;
-    }
+      // handle pongs
+      if (msgs.ping) {
+        this._sendPong(msgs.ping);
+        return;
+      }
 
-    // level2updates
-    if (msgs.ch.endsWith("depth.step0")) {
-      let remoteId = msgs.ch.split(".")[1];
-      let market = this._level2SnapshotSubs.get(remoteId);
-      if (!market) return;
+      if (!msgs.ch) return;
 
-      let update = this._constructLevel2Snapshot(msgs, market);
-      this.emit("l2snapshot", update, market);
-      return;
-    }
+      // trades
+      if (msgs.ch.endsWith("trade.detail")) {
+        msgs = JSON.parse(resp.toString().replace(/:([0-9]{1,}\.{0,1}[0-9]{0,}),/g, ':"$1",'));
+
+        let remoteId = msgs.ch.split(".")[1]; //market.ethbtc.trade.detail
+        let market = this._tradeSubs.get(remoteId);
+        if (!market) return;
+
+        for (let datum of msgs.tick.data) {
+          let trade = this._constructTradesFromMessage(datum, market);
+          this.emit("trade", trade, market);
+        }
+        return;
+      }
+
+      // tickers
+      if (msgs.ch.endsWith(".detail")) {
+        let remoteId = msgs.ch.split(".")[1];
+        let market = this._tickerSubs.get(remoteId);
+        if (!market) return;
+
+        let ticker = this._constructTicker(msgs.tick, market);
+        this.emit("ticker", ticker, market);
+        return;
+      }
+
+      // level2updates
+      if (msgs.ch.endsWith("depth.step0")) {
+        let remoteId = msgs.ch.split(".")[1];
+        let market = this._level2SnapshotSubs.get(remoteId);
+        if (!market) return;
+
+        let update = this._constructLevel2Snapshot(msgs, market);
+        this.emit("l2snapshot", update, market);
+        return;
+      }
+    });
   }
 
   _constructTicker(data, market) {

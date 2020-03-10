@@ -23,6 +23,7 @@
   "dependencies": {
     "cloudscraper": "^1.5.1",
     "decimal.js": "^10.2.0",
+    "minizlib": "^2.1.0",
     "moment": "^2.24.0",
     "pako": "^1.0.11",
     "pusher-js": "^4.4.0",
