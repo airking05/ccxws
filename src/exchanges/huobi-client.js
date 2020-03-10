@@ -75,7 +75,7 @@ class HuobiClient extends BasicClient {
   _onMessage(raw) {
     let resp;
     try {
-      resp = pako.inflateRaw(raw,{ to: 'string' });
+      resp = pako.inflate(raw,{ to: 'string' });
     } catch (err) {
       this.emit("error", err);
       return;
